@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "514509952058",
+    "firebase_url": "https://homecare-fb6aa-default-rtdb.firebaseio.com",
+    "project_id": "homecare-fb6aa",
+    "storage_bucket": "homecare-fb6aa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514509952058:android:1ed5df4b54524375dd9103",
+        "android_client_info": {
+          "package_name": "com.example.homecare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwR3VNy776K1HpXZkaIemdYhrsu3U4nEQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
