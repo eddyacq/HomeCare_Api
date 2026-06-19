@@ -4,6 +4,8 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import authRoutes from './routes/auth.routes.js';
+import workersRoutes from './routes/workers.routes.js';
+import bookingsRoutes from './routes/bookings.routes.js';
 
 const app = express();
 app.use(cors());
@@ -11,6 +13,8 @@ app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/auth', authRoutes);
+app.use('/workers', workersRoutes);
+app.use('/bookings', bookingsRoutes);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: '*' } });
