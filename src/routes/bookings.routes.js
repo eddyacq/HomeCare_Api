@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../config/db.js';
 import { bookings, workers, users } from '../db/schema.js';
-import { verifyFirebaseToken } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -15,7 +15,7 @@ const router = Router();
  *
  * Body: { workerId, serviceType, scheduledAt, address, notes? }
  */
-router.post('/', verifyFirebaseToken, async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const { workerId, serviceType, scheduledAt, address, notes } = req.body;
 
@@ -74,7 +74,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
  * Lists the logged-in client's bookings, most recent first, joined with
  * worker name for display. Optional ?status=pending,confirmed filter.
  */
-router.get('/me', verifyFirebaseToken, async (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
   try {
     const [client] = await db
       .select({ id: users.id })
@@ -116,7 +116,7 @@ router.get('/me', verifyFirebaseToken, async (req, res) => {
  *
  * Client cancels their own pending/confirmed booking.
  */
-router.patch('/:id/cancel', verifyFirebaseToken, async (req, res) => {
+router.patch('/:id/cancel', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;

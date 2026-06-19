@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../config/db.js';
 import { workers, users } from '../db/schema.js';
-import { verifyFirebaseToken } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -14,7 +14,7 @@ const router = Router();
  * Optional ?service= filter matches against the comma-separated
  * `skills` column using a simple LIKE — fine for V1's scale.
  */
-router.get('/', verifyFirebaseToken, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const { service } = req.query;
 
@@ -58,7 +58,7 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
  *
  * Single worker profile — used for the "view profile" screen before booking.
  */
-router.get('/:id', verifyFirebaseToken, async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
