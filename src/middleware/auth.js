@@ -26,6 +26,9 @@ export async function requireAuth(req, res, next) {
     req.user = user || null;
     next();
   } catch (err) {
+    // Temporary — logs the real reason to the Render logs so we can see
+    // past the generic 401. Remove once the underlying cause is fixed.
+    console.error('Token verification failed:', err.message);
     return fail(res, 401, 'INVALID_TOKEN', 'Token verification failed');
   }
 }
