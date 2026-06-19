@@ -18,18 +18,22 @@ export async function requireAuth(req, res, next) {
     return fail(res, 401, 'NO_TOKEN', 'Missing bearer token');
   }
 
+  let decoded;
   try {
-    const decoded = await firebaseAuth.verifyIdToken(token);
-    const [user] = await db.select().from(users).where(eq(users.firebaseUid, decoded.uid));
+    decoded = await firebaseAuth.verifyIdToken(token);
+  } catch (err) {
+    console.error('Firebase token verification failed:', err.code || err.message || err);
+    return fail(res, 401, 'INVALID_TOKEN', 'Token verification failed');
+  }
 
+  try {
+    const [user] = await db.select().from(users).where(eq(users.firebaseUid, decoded.uid));
     req.firebaseUid = decoded.uid;
     req.user = user || null;
     next();
   } catch (err) {
-    // Temporary — logs the real reason to the Render logs so we can see
-    // past the generic 401. Remove once the underlying cause is fixed.
-    console.error('Token verification failed:', err.message);
-    return fail(res, 401, 'INVALID_TOKEN', 'Token verification failed');
+    console.error('Database lookup failed in requireAuth:', err.message || err);
+    return fail(res, 500, 'DB_ERROR', 'Database error during authentication');
   }
 }
 
