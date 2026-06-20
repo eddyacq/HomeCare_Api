@@ -10,29 +10,25 @@ const router = Router();
  * POST /bookings
  *
  * Creates a new booking for the logged-in client.
- * req.user is set by verifyFirebaseToken — expected to contain at least
- * the firebaseUid, which we use to look up the internal user id.
+ * req.user is set by requireAuth — it's the user's row from Postgres
+ * (looked up by firebase_uid), so req.user.id is the internal user id.
+ * It is null if this Firebase user has never called /auth/sync.
  *
  * Body: { workerId, serviceType, scheduledAt, address, notes? }
  */
 router.post('/', requireAuth, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(404).json({ error: { message: 'User not found. Please log in again.' } });
+    }
+    const client = req.user;
+
     const { workerId, serviceType, scheduledAt, address, notes } = req.body;
 
     if (!workerId || !serviceType || !scheduledAt || !address) {
       return res.status(400).json({
         error: { message: 'workerId, serviceType, scheduledAt, and address are required' },
       });
-    }
-
-    // Look up the internal user row for this Firebase user (the client)
-    const [client] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.firebaseUid, req.user.uid));
-
-    if (!client) {
-      return res.status(404).json({ error: { message: 'User not found. Please log in again.' } });
     }
 
     // Confirm the worker exists and is available
@@ -76,14 +72,10 @@ router.post('/', requireAuth, async (req, res) => {
  */
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const [client] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.firebaseUid, req.user.uid));
-
-    if (!client) {
-      return res.status(404).json({ error: { message: 'User not found' } });
+    if (!req.user) {
+      return res.status(404).json({ error: { message: 'User not found. Please log in again.' } });
     }
+    const client = req.user;
 
     const rows = await db
       .select({
@@ -118,17 +110,13 @@ router.get('/me', requireAuth, async (req, res) => {
  */
 router.patch('/:id/cancel', requireAuth, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(404).json({ error: { message: 'User not found. Please log in again.' } });
+    }
+    const client = req.user;
+
     const { id } = req.params;
     const { reason } = req.body;
-
-    const [client] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.firebaseUid, req.user.uid));
-
-    if (!client) {
-      return res.status(404).json({ error: { message: 'User not found' } });
-    }
 
     const [booking] = await db
       .select()
