@@ -1,27 +1,28 @@
 import { Router } from 'express';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '../config/db.js';
-import { workers, users } from '../db/schema.js';
-import { requireAuth } from '../middleware/auth.js';
+import { bookings, workers, users } from '../db/schema.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
+// ─────────────────────────────────────────────────────────────────────────
+// CLIENT-FACING — worker discovery (used by the client app)
+// ─────────────────────────────────────────────────────────────────────────
+
 /**
- * GET /workers
- * GET /workers?service=cleaning
+ * GET /worker
+ * GET /worker?service=cleaning
  *
- * Lists available workers, joined with their user info (name, phone).
- * Optional ?service= filter matches against the comma-separated
- * `skills` column using a simple LIKE — fine for V1's scale.
+ * Lists available workers, joined with their user info. Used by the
+ * client app's worker discovery screen.
  */
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { service } = req.query;
-
     const conditions = [eq(workers.isAvailable, true)];
 
     if (service) {
-      // skills is stored as "cleaning,laundry" — match if it contains the term
       conditions.push(sql`${workers.skills} LIKE ${'%' + service + '%'}`);
     }
 
@@ -48,15 +49,117 @@ router.get('/', requireAuth, async (req, res) => {
 
     res.json({ data: rows });
   } catch (err) {
-    console.error('GET /workers error:', err);
+    console.error('GET /worker error:', err);
     res.status(500).json({ error: { message: 'Failed to fetch workers' } });
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────
+// WORKER-FACING — the logged-in worker's own profile and jobs
+// These specific-word paths (me, me/jobs) are registered BEFORE the
+// generic /:id route below, so Express never tries to treat "me" as an id.
+// ─────────────────────────────────────────────────────────────────────────
+
 /**
- * GET /workers/:id
+ * GET /worker/me
  *
- * Single worker profile — used for the "view profile" screen before booking.
+ * The logged-in worker's own profile. Used by the worker app right after
+ * login to confirm onboarding status (404 here means "not a registered
+ * worker — contact your administrator").
+ */
+router.get('/me', requireAuth, requireRole('worker'), async (req, res) => {
+  try {
+    const [profile] = await db
+      .select({
+        workerId: workers.id,
+        userId: users.id,
+        name: users.name,
+        phone: users.phone,
+        skills: workers.skills,
+        languages: workers.languages,
+        bio: workers.bio,
+        isAvailable: workers.isAvailable,
+        isChildcareVerified: workers.isChildcareVerified,
+        ratingAverage: workers.ratingAverage,
+        ratingCount: workers.ratingCount,
+        jobsCompleted: workers.jobsCompleted,
+        adminRemark: workers.adminRemark,
+      })
+      .from(workers)
+      .where(eq(workers.userId, req.user.id));
+
+    if (!profile) {
+      return res.status(404).json({
+        error: { message: 'No worker profile found for this account. Contact your administrator.' },
+      });
+    }
+
+    res.json({ data: profile });
+  } catch (err) {
+    console.error('GET /worker/me error:', err);
+    res.status(500).json({ error: { message: 'Failed to fetch worker profile' } });
+  }
+});
+
+/**
+ * GET /worker/me/jobs
+ * GET /worker/me/jobs?status=pending
+ *
+ * Bookings assigned to the logged-in worker, optionally filtered by
+ * comma-separated status list.
+ */
+router.get('/me/jobs', requireAuth, requireRole('worker'), async (req, res) => {
+  try {
+    const [workerRow] = await db
+      .select({ id: workers.id })
+      .from(workers)
+      .where(eq(workers.userId, req.user.id));
+
+    if (!workerRow) {
+      return res.status(404).json({ error: { message: 'No worker profile found for this account.' } });
+    }
+
+    const { status } = req.query;
+
+    const rows = await db
+      .select({
+        id: bookings.id,
+        serviceType: bookings.serviceType,
+        status: bookings.status,
+        scheduledAt: bookings.scheduledAt,
+        address: bookings.address,
+        notes: bookings.notes,
+        createdAt: bookings.createdAt,
+        clientId: bookings.clientId,
+        clientName: users.name,
+        clientPhone: users.phone,
+      })
+      .from(bookings)
+      .leftJoin(users, eq(users.id, bookings.clientId))
+      .where(eq(bookings.workerId, workerRow.id))
+      .orderBy(desc(bookings.scheduledAt));
+
+    const filtered = status
+      ? rows.filter((b) => status.split(',').includes(b.status))
+      : rows;
+
+    res.json({ data: filtered });
+  } catch (err) {
+    console.error('GET /worker/me/jobs error:', err);
+    res.status(500).json({ error: { message: 'Failed to fetch jobs' } });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// CLIENT-FACING — single worker profile (must come AFTER /me routes above)
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /worker/:id
+ *
+ * Single worker profile — used for a "view profile" screen in the client
+ * app before booking. Registered last so it never intercepts /me or
+ * /me/jobs (Express matches routes top-to-bottom).
  */
 router.get('/:id', requireAuth, async (req, res) => {
   try {
@@ -89,7 +192,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     res.json({ data: worker });
   } catch (err) {
-    console.error('GET /workers/:id error:', err);
+    console.error('GET /worker/:id error:', err);
     res.status(500).json({ error: { message: 'Failed to fetch worker' } });
   }
 });
