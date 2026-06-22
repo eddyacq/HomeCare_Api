@@ -86,6 +86,7 @@ router.get('/me', requireAuth, requireRole('worker'), async (req, res) => {
         adminRemark: workers.adminRemark,
       })
       .from(workers)
+      .innerJoin(users, eq(users.id, workers.userId))   // ← this line was missing
       .where(eq(workers.userId, req.user.id));
 
     if (!profile) {
@@ -96,7 +97,7 @@ router.get('/me', requireAuth, requireRole('worker'), async (req, res) => {
 
     res.json({ data: profile });
   } catch (err) {
-    console.error('GET /worker/me error:', err);
+    console.error('GET /workers/me error:', err);
     res.status(500).json({ error: { message: 'Failed to fetch worker profile' } });
   }
 });
