@@ -160,6 +160,20 @@ export const complaints = pgTable('complaints', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// ─────────────────────────────────────────────────────────────────────────
+// ADMINS — separate from `users`/Firebase entirely. Own email+password
+// auth, own JWT issued by the Express API on login.
+// ─────────────────────────────────────────────────────────────────────────
+export const admins = pgTable('admins', {
+  id: integer('id').generatedAlwaysAsIdentity().primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  name: varchar('name', { length: 255 }),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // import {
 //   mysqlTable,
 //   varchar,
