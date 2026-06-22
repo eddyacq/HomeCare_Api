@@ -18,5 +18,7 @@ export default defineConfig({
   dialect: 'postgresql',
   dbCredentials: {
     url: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
   },
+  tablesFilter: ['users', 'workers', 'bookings', 'reviews', 'complaints', 'admins'],
 });
