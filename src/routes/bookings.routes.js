@@ -239,4 +239,69 @@ router.patch('/:id/advance', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * PATCH /bookings/:id/respond
+ *
+ * Worker accepts or declines a pending booking assigned to them.
+ * Body: { action: 'accept' | 'decline', reason? }
+ *
+ * Accept:  pending -> confirmed
+ * Decline: pending -> cancelled (cancelledBy: 'worker')
+ */
+router.patch('/:id/respond', requireAuth, async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'worker') {
+      return res.status(403).json({ error: { message: 'Only workers can respond to job requests' } });
+    }
+
+    const { id } = req.params;
+    const { action, reason } = req.body;
+
+    if (!['accept', 'decline'].includes(action)) {
+      return res.status(400).json({ error: { message: "action must be 'accept' or 'decline'" } });
+    }
+
+    const [workerRow] = await db
+      .select({ id: workers.id })
+      .from(workers)
+      .where(eq(workers.userId, req.user.id));
+
+    if (!workerRow) {
+      return res.status(404).json({ error: { message: 'No worker profile found for this account.' } });
+    }
+
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(and(eq(bookings.id, Number(id)), eq(bookings.workerId, workerRow.id)));
+
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found' } });
+    }
+    if (booking.status !== 'pending') {
+      return res.status(409).json({ error: { message: 'This booking has already been responded to' } });
+    }
+
+    const [updated] = await db
+      .update(bookings)
+      .set(
+        action === 'accept'
+          ? { status: 'confirmed', updatedAt: new Date() }
+          : {
+              status: 'cancelled',
+              cancelledBy: 'worker',
+              cancellationReason: reason || null,
+              updatedAt: new Date(),
+            }
+      )
+      .where(eq(bookings.id, Number(id)))
+      .returning();
+
+    res.json({ data: updated });
+  } catch (err) {
+    console.error('PATCH /bookings/:id/respond error:', err);
+    res.status(500).json({ error: { message: 'Failed to respond to booking' } });
+  }
+});
+
 export default router;
