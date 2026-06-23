@@ -3,7 +3,7 @@ import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '../config/db.js';
 import { bookings, workers, users } from '../db/schema.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-
+import { firebaseAuth } from '../config/firebase.js';
 const router = Router();
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -148,6 +148,71 @@ router.get('/me/jobs', requireAuth, requireRole('worker'), async (req, res) => {
   } catch (err) {
     console.error('GET /worker/me/jobs error:', err);
     res.status(500).json({ error: { message: 'Failed to fetch jobs' } });
+  }
+});
+
+
+/**
+ * POST /workers/link-account
+ *
+ * Called once, automatically, the first time a worker successfully logs
+ * in via Firebase phone OTP. Finds the `users` row matching their phone
+ * number (created earlier by an admin, with a placeholder firebase_uid
+ * like "pending-..."), and overwrites it with their real Firebase UID
+ * from the verified token.
+ */
+router.post('/link-account', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+    if (!token) {
+      return res.status(401).json({ error: { message: 'Missing bearer token' } });
+    }
+
+    let decoded;
+    try {
+      decoded = await firebaseAuth.verifyIdToken(token);
+    } catch (err) {
+      return res.status(401).json({ error: { message: 'Token verification failed' } });
+    }
+
+    const phone = decoded.phone_number;
+    if (!phone) {
+      return res.status(400).json({ error: { message: 'No phone number on this token' } });
+    }
+
+    const [existingUser] = await db.select().from(users).where(eq(users.phone, phone));
+
+    if (!existingUser) {
+      return res.status(404).json({
+        error: { message: 'No worker profile found for this phone number. Contact your administrator.' },
+      });
+    }
+
+    if (existingUser.role !== 'worker') {
+      return res.status(403).json({ error: { message: 'This account is not registered as a worker.' } });
+    }
+
+    if (existingUser.firebaseUid === decoded.uid) {
+      return res.json({ data: { linked: true, alreadyLinked: true } });
+    }
+
+    if (!existingUser.firebaseUid.startsWith('pending-')) {
+      return res.status(409).json({
+        error: { message: 'This phone number is already linked to a different account.' },
+      });
+    }
+
+    await db
+      .update(users)
+      .set({ firebaseUid: decoded.uid, updatedAt: new Date() })
+      .where(eq(users.id, existingUser.id));
+
+    res.json({ data: { linked: true, alreadyLinked: false } });
+  } catch (err) {
+    console.error('POST /workers/link-account error:', err);
+    res.status(500).json({ error: { message: 'Failed to link account' } });
   }
 });
 
