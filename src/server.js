@@ -8,6 +8,7 @@ import workersRoutes from './routes/workers.routes.js';
 import bookingsRoutes from './routes/bookings.routes.js';
 import adminAuthRoutes from './routes/admin-auth.routes.js';
 import adminWorkersRoutes from './routes/admin-workers.routes.js';
+import reviewsRoutes from './routes/reviews.routes.js';
 
 const app = express();
 app.use(cors());
@@ -19,6 +20,7 @@ app.use('/workers', workersRoutes);
 app.use('/bookings', bookingsRoutes);
 app.use('/admin/auth', adminAuthRoutes);
 app.use('/admin/workers', adminWorkersRoutes);
+app.use('/reviews', reviewsRoutes);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: '*' } });
