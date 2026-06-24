@@ -174,6 +174,16 @@ export const admins = pgTable('admins', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+export const messages = pgTable('messages', {
+  id: integer('id').generatedAlwaysAsIdentity().primaryKey(),
+  bookingId: integer('booking_id').notNull(), // FK -> bookings.id
+  senderId: integer('sender_id').notNull(),   // FK -> users.id
+  text: text('text').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+
 // import {
 //   mysqlTable,
 //   varchar,
