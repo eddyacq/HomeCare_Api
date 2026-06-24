@@ -62,6 +62,7 @@ export const users = pgTable('users', {
   phone: varchar('phone', { length: 20 }),
   email: varchar('email', { length: 255 }),
   name: varchar('name', { length: 255 }),
+  fcmToken: varchar('fcm_token', { length: 255 }), // for push notifications; null until app registers one
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -173,7 +174,6 @@ export const admins = pgTable('admins', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
-
 // import {
 //   mysqlTable,
 //   varchar,
