@@ -27,7 +27,7 @@ app.use('/auth', authRoutes);
 app.use('/auth', fcmRoutes);
 app.use('/workers', workersRoutes);
 app.use('/bookings', bookingsRoutes);
-app.use('/bookings', messagesRoutes);
+app.use('/messages', messagesRoutes);
 app.use('/admin/auth', adminAuthRoutes);
 app.use('/admin/workers', adminWorkersRoutes);
 app.use('/reviews', reviewsRoutes);
