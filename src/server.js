@@ -5,17 +5,18 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { eq } from 'drizzle-orm';
 import { db } from './config/db.js';
-import { messages, users } from './db/schema.js';
+import { messages, users, bookings, workers } from './db/schema.js';
 import { firebaseAuth } from './config/firebase.js';
+import { sendPush } from './config/notifications.js';
 import { canAccessBookingChat } from './routes/messages.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import fcmRoutes from './routes/fcm.routes.js';
 import workersRoutes from './routes/workers.routes.js';
 import bookingsRoutes from './routes/bookings.routes.js';
+import messagesRoutes from './routes/messages.routes.js';
 import adminAuthRoutes from './routes/admin-auth.routes.js';
 import adminWorkersRoutes from './routes/admin-workers.routes.js';
 import reviewsRoutes from './routes/reviews.routes.js';
-import fcmRoutes from './routes/fcm.routes.js';
-import messagesRoutes from './routes/messages.routes.js';
 
 const app = express();
 app.use(cors());
@@ -23,18 +24,16 @@ app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/auth', authRoutes);
+app.use('/auth', fcmRoutes);
 app.use('/workers', workersRoutes);
 app.use('/bookings', bookingsRoutes);
+app.use('/bookings', messagesRoutes);
 app.use('/admin/auth', adminAuthRoutes);
 app.use('/admin/workers', adminWorkersRoutes);
 app.use('/reviews', reviewsRoutes);
-app.use('/auth', fcmRoutes); // mounts POST /auth/fcm-token
-app.use('/messages', messagesRoutes);
-
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: '*' } });
-
 
 // ── Socket.IO chat ────────────────────────────────────────────────────────
 // Authentication: client sends Firebase ID token in socket handshake auth.
@@ -95,6 +94,47 @@ io.on('connection', (socket) => {
         text: saved.text,
         createdAt: saved.createdAt,
       });
+
+      // Push notification to the OTHER participant if they're not in the room.
+      // Check room membership — if they're already in booking:{id} they'll get
+      // the socket event and don't need a push on top of it.
+      const room = io.sockets.adapter.rooms.get(`booking:${id}`);
+      const socketsInRoom = room ? room.size : 0;
+
+      // Only send push if the recipient isn't already in the room (i.e. < 2 people)
+      if (socketsInRoom < 2) {
+        try {
+          const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+          if (booking) {
+            let recipientUserId;
+            if (socket.user.role === 'client') {
+              // Sender is client — notify the worker
+              const [workerRow] = await db.select({ userId: workers.userId })
+                .from(workers).where(eq(workers.id, booking.workerId));
+              recipientUserId = workerRow?.userId;
+            } else {
+              // Sender is worker — notify the client
+              recipientUserId = booking.clientId;
+            }
+
+            if (recipientUserId) {
+              const [recipient] = await db.select({ fcmToken: users.fcmToken })
+                .from(users).where(eq(users.id, recipientUserId));
+              const preview = text.trim().length > 60
+                ? text.trim().substring(0, 60) + '…'
+                : text.trim();
+              sendPush(recipient?.fcmToken, {
+                title: socket.user.name || 'New message',
+                body: preview,
+                data: { bookingId: String(id), type: 'new_message' },
+              });
+            }
+          }
+        } catch (pushErr) {
+          // Never let a push failure affect the message delivery
+          console.error('Chat push notification failed:', pushErr.message);
+        }
+      }
     } catch (err) {
       console.error('message:send error:', err);
       socket.emit('error', { message: 'Failed to send message' });
