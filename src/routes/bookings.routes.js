@@ -317,5 +317,5 @@ router.patch('/:id/advance', requireAuth, async (req, res) => {
     res.status(500).json({ error: { message: 'Failed to update booking status' } });
   }
 });
-
+//nice
 export default router;
