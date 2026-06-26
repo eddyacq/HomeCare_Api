@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { db } from './config/db.js';
 import { messages, users, bookings, workers } from './db/schema.js';
 import { firebaseAuth } from './config/firebase.js';
-import { sendPush } from './config/notifications.js';
+import { sendPushToUser } from './config/notifications.js';
 import { canAccessBookingChat } from './routes/messages.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import fcmRoutes from './routes/fcm.routes.js';
