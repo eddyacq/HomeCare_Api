@@ -17,6 +17,7 @@ import messagesRoutes from './routes/messages.routes.js';
 import adminAuthRoutes from './routes/admin-auth.routes.js';
 import adminWorkersRoutes from './routes/admin-workers.routes.js';
 import reviewsRoutes from './routes/reviews.routes.js';
+import adminBookingsRoutes from './routes/admin-bookings.routes.js';
 
 const app = express();
 app.use(cors());
@@ -31,6 +32,7 @@ app.use('/messages', messagesRoutes);
 app.use('/admin/auth', adminAuthRoutes);
 app.use('/admin/workers', adminWorkersRoutes);
 app.use('/reviews', reviewsRoutes);
+app.use('/admin/bookings', adminBookingsRoutes);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: '*' } });
